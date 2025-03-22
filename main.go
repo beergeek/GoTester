@@ -1,110 +1,118 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
-	"strings"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
+	"github.com/gorilla/mux"
 )
 
-type PayloadType string
+const weatherAPI = "https://api.open-meteo.com/v1/forecast?latitude=37.3996&longitude=144.5884&current=temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,rain,apparent_temperature,wind_gusts_10m&timezone=Australia%2FSydney"
 
-const (
-	NoPayload          PayloadType = "No Payload"
-	GenericPayload     PayloadType = "Generic Payload"
-	PotentialMalicious PayloadType = "Potentially Malicious Payload"
-)
-
-type Conversation struct {
-	Source      string
-	Destination string
-	Protocol    string
-	PayloadType PayloadType
-	HasPayload  bool
+type weatherAPIResponse struct {
+	CurrentWeather struct {
+		DateTime            string  `json:"datetime"`
+		Temperature         float64 `json:"temperature_2m"`
+		WindSpeed           float64 `json:"wind_speed_10m"`
+		WindGusts           float64 `json:"wind_gusts_10m"`
+		Humidity            int     `json:"relative_humidity_2m"`
+		ApparentTemperature float64 `json:"apparent_temperature"`
+		Rain                float64 `json:"rain"`
+		Precipitation       float64 `json:"precipitation"`
+	} `json:"current"`
 }
 
-func analyzePayload(payload []byte) PayloadType {
-	// This is a basic check. In real scenarios, more sophisticated analysis would be required.
-	payloadStr := string(payload)
+type weatherResponse struct {
+	Time          string `json:"time"`
+	Temperature   string `json:"temperature"`
+	ApparentTemp  string `json:"apparent_temperature"`
+	WindSpeed     string `json:"wind_speed_kmh"`
+	WindGusts     string `json:"wind_gusts_kmh"`
+	Humidity      string `json:"humidity_percent"`
+	Precipitation string `json:"precipitation_mm"`
+	Rain          string `json:"rain_mm"`
+}
 
-	// Check for common patterns of malicious content
-	maliciousPatterns := []string{"malware", "virus", "exploit", "attack", "java", "kubernetes"}
-	for _, pattern := range maliciousPatterns {
-		if strings.Contains(strings.ToLower(payloadStr), pattern) {
-			return PotentialMalicious
-		}
+var processRequest = func(w http.ResponseWriter, r *http.Request) {
+	resp, err := http.Get(weatherAPI)
+	if err != nil {
+		http.Error(w, "Failed to fetch weather data", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading weather API response", http.StatusInternalServerError)
+		return
 	}
 
-	if len(payload) > 0 {
-		return GenericPayload
+	var apiResp weatherAPIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		http.Error(w, "Error parsing weather data", http.StatusInternalServerError)
+		return
 	}
 
-	return NoPayload
+	weather := weatherResponse{
+		Time:          apiResp.CurrentWeather.DateTime,
+		Temperature:   fmt.Sprintf("%.1f°C", apiResp.CurrentWeather.Temperature),
+		ApparentTemp:  fmt.Sprintf("%.1f°C", apiResp.CurrentWeather.ApparentTemperature),
+		WindSpeed:     fmt.Sprintf("%.1f km/h", apiResp.CurrentWeather.WindSpeed),
+		WindGusts:     fmt.Sprintf("%.1f km/h", apiResp.CurrentWeather.WindGusts),
+		Humidity:      fmt.Sprintf("%d%%", apiResp.CurrentWeather.Humidity),
+		Precipitation: fmt.Sprintf("%.2f mm", apiResp.CurrentWeather.Precipitation),
+		Rain:          fmt.Sprintf("%.2f mm", apiResp.CurrentWeather.Rain),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(weather); err != nil {
+		log.Printf("Failed to write response: %v", err)
+	}
+
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatalf("Usage: %s <pcap file>\n", os.Args[0])
+
+	listenAdddr := os.Getenv("LISTEN_ADDR")
+	if listenAdddr == "" {
+		listenAdddr = "0.0.0.0:8080"
 	}
-	filename := os.Args[1]
 
-	handle, err := pcap.OpenOffline(filename)
-	if err != nil {
-		log.Fatal(err)
+	webServer := &http.Server{
+		Addr:         listenAdddr,
+		Handler:      nil,
+		ReadTimeout:  10 * time.Minute,
+		WriteTimeout: 20 * time.Minute,
+		IdleTimeout:  60 * time.Second,
 	}
-	defer handle.Close()
 
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	router := mux.NewRouter()
+	router.HandleFunc("/", processRequest).Methods("GET")
 
-	conversations := make(map[string]*Conversation)
-
-	for packet := range packetSource.Packets() {
-		networkLayer := packet.NetworkLayer()
-		if networkLayer == nil {
-			continue
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		log.Printf("Server listening on %s", webServer.Addr)
+		if err := webServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Could not listen on %s: %v\n", webServer.Addr, err)
 		}
+	}()
 
-		transportLayer := packet.TransportLayer()
-		if transportLayer == nil {
-			continue
-		}
-
-		source := networkLayer.NetworkFlow().Src().String()
-		destination := networkLayer.NetworkFlow().Dst().String()
-		protocol := transportLayer.LayerType().String()
-		payload := transportLayer.LayerPayload()
-		payloadType := analyzePayload(payload)
-
-		convKey := fmt.Sprintf("%s:%s:%s", source, destination, protocol)
-		if conv, exists := conversations[convKey]; exists {
-			if payloadType == PotentialMalicious || (payloadType == GenericPayload && conv.PayloadType != PotentialMalicious) {
-				conv.PayloadType = payloadType
-			}
-			if len(payload) > 0 {
-				conv.HasPayload = true
-			}
-		} else {
-			conversations[convKey] = &Conversation{
-				Source:      source,
-				Destination: destination,
-				Protocol:    protocol,
-				PayloadType: payloadType,
-				HasPayload:  len(payload) > 0,
-			}
-		}
+	<-quit
+	log.Println("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := webServer.Shutdown(ctx); err != nil {
+		log.Fatalf("Server Shutdown Failed: %v", err)
 	}
-
-	var output []Conversation
-	for _, conv := range conversations {
-		output = append(output, *conv)
-	}
-
-	fmt.Println("Conversations:")
-	for _, conv := range output {
-		fmt.Printf("Source: %s, Destination: %s, Protocol: %s, Has Payload: %v, Payload Type: %s\n",
-			conv.Source, conv.Destination, conv.Protocol, conv.HasPayload, conv.PayloadType)
-	}
+	log.Println("Server exited cleanly.")
 }
