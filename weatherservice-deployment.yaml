@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weatherservice
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: weatherservice
+  template:
+    metadata:
+      labels:
+        app: weatherservice
+    spec:
+      containers:
+      - image: beergeek1679/weatherservice
+        name: weatherservice
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"        
+        ports:
+        - containerPort: 8080
