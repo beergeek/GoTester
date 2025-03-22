@@ -42,6 +42,7 @@ type weatherResponse struct {
 }
 
 var processRequest = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Processing request")
 	resp, err := http.Get(weatherAPI)
 	if err != nil {
 		http.Error(w, "Failed to fetch weather data", http.StatusInternalServerError)
@@ -80,6 +81,12 @@ var processRequest = func(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("Received request for unhandled path: %s\n", r.URL.Path)
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprintf(w, "404 - The path %s was not found on this server.", r.URL.Path)
+}
+
 func main() {
 
 	listenAdddr := os.Getenv("LISTEN_ADDR")
@@ -96,7 +103,8 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/", processRequest).Methods("GET")
+	router.HandleFunc("/weather", processRequest).Methods("GET")
+	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
