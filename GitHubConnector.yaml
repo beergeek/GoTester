@@ -1,0 +1,21 @@
+connector:
+  name: GitHubConnector
+  identifier: GitHubConnector
+  description: ""
+  accountIdentifier: 4WSqWhBHS2K3ERqRYcAIEw
+  orgIdentifier: default
+  projectIdentifier: default_project
+  type: Github
+  spec:
+    url: https://github.com/beergeek/GoTester
+    authentication:
+      type: Http
+      spec:
+        type: UsernameToken
+        spec:
+          username: beergeek
+          tokenRef: GitHub
+    executeOnDelegate: false
+    proxy: false
+    ignoreTestConnection: false
+    type: Repo

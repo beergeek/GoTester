@@ -1,0 +1,19 @@
+connector:
+  name: DockerReg
+  identifier: DockerReg
+  description: ""
+  accountIdentifier: 4WSqWhBHS2K3ERqRYcAIEw
+  orgIdentifier: default
+  projectIdentifier: default_project
+  type: DockerRegistry
+  spec:
+    dockerRegistryUrl: https://index.docker.io/v2/
+    providerType: DockerHub
+    auth:
+      type: UsernamePassword
+      spec:
+        username: beergeek1679
+        passwordRef: Docker
+    executeOnDelegate: false
+    proxy: false
+    ignoreTestConnection: false

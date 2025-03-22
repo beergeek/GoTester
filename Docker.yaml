@@ -1,0 +1,10 @@
+secret:
+  type: SecretText
+  name: Docker
+  identifier: Docker
+  orgIdentifier: default
+  projectIdentifier: default_project
+  description: ""
+  spec:
+    secretManagerIdentifier: harnessSecretManager
+    valueType: Inline

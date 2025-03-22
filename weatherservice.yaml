@@ -1,0 +1,26 @@
+service:
+  name: weatherservice
+  identifier: weatherservice
+  orgIdentifier: default
+  projectIdentifier: default_project
+  serviceDefinition:
+    type: Kubernetes
+    spec:
+      manifests:
+        - manifest:
+            identifier: weatherservice
+            type: K8sManifest
+            spec:
+              store:
+                type: Github
+                spec:
+                  connectorRef: GitHubConnector
+                  gitFetchType: Branch
+                  paths:
+                    - weatherservice-deployment.yaml
+                    - weatherservice-svc.yaml
+                  repoName: GoTester
+                  branch: main
+                skipResourceVersioning: false
+                enableDeclarativeRollback: false
+    gitOpsEnabled: false

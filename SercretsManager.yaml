@@ -1,0 +1,11 @@
+connector:
+  name: Harness Built-in Secret Manager
+  identifier: harnessSecretManager
+  accountIdentifier: 4WSqWhBHS2K3ERqRYcAIEw
+  orgIdentifier: default
+  projectIdentifier: default_project
+  type: GcpKms
+  spec:
+    ignoreTestConnection: false
+    executeOnDelegate: true
+    default: true

@@ -1,0 +1,14 @@
+connector:
+  name: harness_k8sconnector
+  identifier: harnessk8sconnector
+  description: ""
+  accountIdentifier: 4WSqWhBHS2K3ERqRYcAIEw
+  orgIdentifier: default
+  projectIdentifier: default_project
+  type: K8sCluster
+  spec:
+    credential:
+      type: InheritFromDelegate
+    delegateSelectors:
+      - helm-delegate
+    ignoreTestConnection: false
