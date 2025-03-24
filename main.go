@@ -94,17 +94,17 @@ func main() {
 		listenAdddr = "0.0.0.0:8080"
 	}
 
+	router := mux.NewRouter()
+	router.Methods("GET").Path("/").HandlerFunc(processRequest)
+	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
+
 	webServer := &http.Server{
 		Addr:         listenAdddr,
-		Handler:      nil,
+		Handler:      router,
 		ReadTimeout:  10 * time.Minute,
 		WriteTimeout: 20 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
-
-	router := mux.NewRouter()
-	router.HandleFunc("/weather", processRequest).Methods("GET")
-	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
