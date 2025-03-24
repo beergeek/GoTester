@@ -19,7 +19,7 @@ const weatherAPI = "https://api.open-meteo.com/v1/forecast?latitude=37.3996&long
 
 type weatherAPIResponse struct {
 	CurrentWeather struct {
-		DateTime            string  `json:"datetime"`
+		DateTime            string  `json:"time"`
 		Temperature         float64 `json:"temperature_2m"`
 		WindSpeed           float64 `json:"wind_speed_10m"`
 		WindGusts           float64 `json:"wind_gusts_10m"`
